@@ -6549,6 +6549,9 @@ test("runtime reinjection loads the same complete content-script stack as the ma
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "manifest.json"), "utf8"));
   assert.deepEqual(background.ISOLATED_CONTENT_SCRIPT_FILES, manifest.content_scripts[0].js);
   assert.ok(background.ISOLATED_CONTENT_SCRIPT_FILES.includes("src/conversation-source.js"));
+  background.ISOLATED_CONTENT_SCRIPT_FILES.forEach((file) => {
+    assert.ok(fs.existsSync(path.join(__dirname, "..", file)), `Reinjection file is missing: ${file}`);
+  });
 });
 
 test("status alarm stores latest OpenAI status while preserving the numeric toolbar count", async () => {

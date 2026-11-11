@@ -1627,6 +1627,29 @@
   function modelFeatures(stats, model, state, limit) {
     stats = sanitizeDashboardStats(stats || {});
     var rowsById = {};
+    // An omitted date range means the text row shows all-time totals.
+    // Use the stored all-time feature aggregate as well, instead of silently
+    // limiting its feature labels to the chart's default recent date window.
+    // Source-filtered views still need their date/source-aware relation data.
+    if (!hasExplicitDateRange(state || {}) && normalizeSourceModeFilter(state && state.sourceModeFilter) === "all") {
+      var saved = stats.featuresByModel && stats.featuresByModel[model];
+      Object.keys(saved && saved.features || {}).forEach(function addAllTimeFeature(rawId) {
+        var feature = saved.features[rawId] || {};
+        var id = normalizeDashboardFeatureId(rawId);
+        var count = Math.max(0, Number(feature.count) || 0);
+        if (!id || !count) return;
+        var row = rowsById[id] || { id: id, label: featureLabel(state, id), count: 0, lastSubmittedAt: "" };
+        row.count += count;
+        if (String(feature.lastSubmittedAt || "") > row.lastSubmittedAt) row.lastSubmittedAt = String(feature.lastSubmittedAt);
+        rowsById[id] = row;
+      });
+      if (Object.keys(rowsById).length) {
+        return Object.keys(rowsById).map(function toAllTimeRow(id) { return rowsById[id]; })
+          .sort(function byCount(a, b) {
+            return b.count - a.count || String(b.lastSubmittedAt).localeCompare(String(a.lastSubmittedAt));
+          }).slice(0, limit || Object.keys(rowsById).length);
+      }
+    }
     var entries = aggregateRelationsInRange(stats, state, model);
     entries.forEach(function addRelationFeatures(entry) {
       var relation = entry && entry.relation || {};
