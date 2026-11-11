@@ -1,0 +1,29 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Syntax checks
+        run: npm run check:syntax
+      - name: Unit and integration tests
+        run: npm test
+      - name: Local-calendar regression tests (Tokyo)
+        run: TZ=Asia/Tokyo node --test tests/date-utils.test.js tests/dashboard.test.js
+      - name: Local-calendar regression tests (Los Angeles)
+        run: TZ=America/Los_Angeles node --test tests/date-utils.test.js tests/dashboard.test.js
+      - name: Local-calendar regression tests (Berlin)
+        run: TZ=Europe/Berlin node --test tests/date-utils.test.js tests/dashboard.test.js
+      - name: Build release archive
+        run: npm run build:release
