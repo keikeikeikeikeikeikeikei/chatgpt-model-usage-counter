@@ -8,7 +8,7 @@
 
 **Track ChatGPT model usage locally and export explicitly selected conversations from the signed-in account list.**
 
-[中文说明](#-中文) · [English](#-english) · [下载 / Download](https://github.com/Bsnblanc/chatgpt-model-usage-counter/releases)
+[日本語](#-日本語) · [中文说明](#-中文) · [English](#-english) · [下载 / Download](https://github.com/Bsnblanc/chatgpt-model-usage-counter/releases)
 
 <img src="store-assets/promotional/small-promo-440x280.png" alt="界面预览 / Preview" width="440" />
 
@@ -29,6 +29,21 @@
   <img src="store-assets/screenshots/03-readable-exports-1280x800.png" alt="Readable PDF, DOCX, and PNG exports" width="78%" />
 </p>
 
+<a id="-日本語"></a>
+
+## 🇯🇵 日本語
+
+このChrome拡張機能は、ChatGPTでの送信回数をモデル別・日付別にブラウザ内で集計します。OpenAI公式の使用上限やトークン数を測定するものではありません。
+
+- **日本語に切り替える:** ChatGPTページ右上の「使用量」ボタン、またはChromeの拡張機能アイコンから画面を開き、**設定 → 言語 → 日本語**を選択します。英語・中国語にも切り替えられます。
+- **ページ右上のボタンを隠す:** **設定 → ページ内ボタン → 非表示**を選択します。ページ内の入口だけが消え、統計の記録とChromeツールバーからの表示は引き続き利用できます。
+- **確認できる内容:** モデルごとの使用量、日別の推移、Basic／Advanced表示、Chat／Work別の集計、統計データのバックアップ、会話のローカルエクスポート。
+- **インストール:** [Releases](https://github.com/Bsnblanc/chatgpt-model-usage-counter/releases)から拡張機能を取得して展開し、`chrome://extensions/` で開発者モードを有効にして「パッケージ化されていない拡張機能を読み込む」から選択します。
+
+この機能は開発ブランチでの追加です。本家の公開リリースにはまだ反映されていない場合があります。
+
+---
+
 <a id="-中文"></a>
 
 ## 🇨🇳 中文
@@ -39,7 +54,7 @@
 
 | 功能 | 实际行为 |
 |---|---|
-| **自动语言** | 默认跟随 ChatGPT 网页语言；无法读取时跟随浏览器语言，也可在设置中固定为 English 或中文；两个入口共享选择 |
+| **自动语言** | 默认跟随 ChatGPT 网页语言；无法读取时跟随浏览器语言，也可在设置中固定为 English、中文或日本語；两个入口共享选择 |
 | **Chat / Work** | Chat 和 Work 共用同一条统计事件链，可按“全部 / Chat / Work”筛选 |
 | **一次提交只计一次** | 提交时建立事件；请求型号和最终回复型号随后更新到同一事件，最终回复不会增加第二次计数 |
 | **Basic（映射）** | 按当前账号模型目录解析后的公开模型汇总；新型号无法映射时保留精确内部 slug，不猜测旧名称 |
@@ -92,7 +107,7 @@ The extension records ChatGPT web submissions, model relationships, and related 
 
 | Feature | Actual behavior |
 |---|---|
-| **Automatic language** | The interface follows the ChatGPT page language by default, falls back to the browser language, and can be fixed to English or Chinese; both entry points share the choice |
+| **Automatic language** | The interface follows the ChatGPT page language by default, falls back to the browser language, and can be set to English, Chinese, or Japanese; both entry points share the choice |
 | **Chat / Work** | Chat and Work use the same event pipeline and can be filtered by All, Chat, or Work |
 | **One count per submission** | A submission creates one event; request and final-response evidence update that same event without adding a second count |
 | **Basic (mapped)** | Aggregates by the public model resolved from the signed-in account catalog; an unmapped new model keeps its exact internal slug instead of being guessed |
@@ -100,6 +115,7 @@ The extension records ChatGPT web submissions, model relationships, and related 
 | **Line chart** | Shows daily trends for the active date, source, mode, and visible-model filters, with each curve labeled directly |
 | **Two-level donut chart** | Level one shows model composition; selecting a model shows its reasoning-effort composition; selecting an effort only expands matching conversation indexes and does not open another statistics level |
 | **Theme** | Supports System, Light, and Dark; a manual theme does not inherit the ChatGPT page theme |
+| **In-page button** | Can be hidden in Settings without disabling recording or the Chrome toolbar popup |
 | **Shared entry state** | The in-page entry and toolbar popup share language, main view, dates, Chat/Work, Basic/Advanced, theme, independent line/donut/text visibility, and separate visible-model choices for both modes |
 | **Dynamic badge** | The toolbar badge always shows the count for the same date range, Chat/Work source, Basic/Advanced mode, and visible models as the panel; an explicit empty selection hides the zero badge, while service state changes only its color. Chrome draws the native badge over the icon at a fixed browser-controlled position, and the extension does not claim to move it; the letter-free Model Processor mark keeps its normal proportions, while its processor body and three-core model window remain recognizable when lower-right pins are partially covered |
 | **Current chat first** | The open chat is read from the already rendered ChatGPT page first, appears at the top immediately, and is checked on the initial list load |
