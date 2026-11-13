@@ -847,6 +847,24 @@ async function main() {
     );
     assert.equal(japanesePopup.language, "ja");
     assert.match(japanesePopup.headline, /モデル使用量/);
+    const monitoringBefore = await evaluate(
+      cdp,
+      reopenedPopupSessionId,
+      `(() => ({
+        off: document.querySelector('[data-status-monitor-select="off"]')?.getAttribute("aria-pressed"),
+        label: document.querySelector('[data-settings-category="status-monitor"]')?.textContent || ""
+      }))()`
+    );
+    assert.equal(monitoringBefore.off, "true", "Status monitoring should be disabled by default.");
+    assert.match(monitoringBefore.label, /OpenAIの稼働状況監視/);
+    await evaluate(cdp, reopenedPopupSessionId, `(() => {
+      document.querySelector('[data-status-monitor-select="off"]').click();
+      return true;
+    })()`);
+    await wait(500);
+    const monitoringSettings = await readStorage(cdp, storageSessionId);
+    assert.equal(monitoringSettings[SETTINGS_KEY].openAIStatusMonitoring, false);
+
     await evaluate(
       cdp,
       reopenedPopupSessionId,

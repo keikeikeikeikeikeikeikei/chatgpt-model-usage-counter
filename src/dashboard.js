@@ -673,9 +673,17 @@
     rollingSeven: "Last 7 days",
     rollingThirtyOne: "Last 31 days",
     todayOnly: "Today {today}",
+    statusMonitorSetting: "OpenAI status monitoring",
+    statusMonitorOn: "On (every 5 minutes)",
+    statusMonitorOff: "Off (no API requests)",
+    statusMonitorDisabled: "Monitoring is off. Enable it in Settings to load OpenAI service status.",
     variants: "Response model"
   });
 
+  I18N.zh.statusMonitorSetting = "OpenAI 状态监控";
+  I18N.zh.statusMonitorOn = "开启（每5分钟）";
+  I18N.zh.statusMonitorOff = "关闭（不请求API）";
+  I18N.zh.statusMonitorDisabled = "监控已关闭。可在设置中开启以读取 OpenAI 服务状态。";
   I18N.ja = Object.assign({}, I18N.en, {
     "all": "すべて選択",
     "api": "API",
@@ -872,6 +880,10 @@
     "sourceModeWork": "Work",
     "sourceModeUnknown": "不明",
     "startDate": "開始",
+    "statusMonitorSetting": "OpenAIの稼働状況監視",
+    "statusMonitorOn": "オン（5分ごと）",
+    "statusMonitorOff": "オフ（API通信なし）",
+    "statusMonitorDisabled": "稼働状況の監視はオフです。設定からオンにすると取得できます。",
     "todayOnly": "今日 {today}",
     "unrecognizedAggregates": "一部の過去のモデルは識別できません。保存済みの件数は保持されていますが、この表示には含まれません。",
     "followToday": "開始日を固定・終了日は今日に合わせる",
@@ -1992,6 +2004,7 @@
             showTrendChart: true,
             showTextStatistics: true,
             showPageButton: true,
+            openAIStatusMonitoring: false,
             statisticsSectionOrder: DEFAULT_STATISTICS_SECTION_ORDER.slice(),
             startDate: "",
             endDate: ""
@@ -2009,6 +2022,7 @@
         showTrendChart: true,
         showTextStatistics: true,
         showPageButton: true,
+        openAIStatusMonitoring: false,
         statisticsSectionOrder: DEFAULT_STATISTICS_SECTION_ORDER.slice(),
         startDate: "",
         endDate: ""
@@ -2027,7 +2041,7 @@
   }
 
   function ensureOpenAIStatus(state, force) {
-    if (!state) {
+    if (!state || state.openAIStatusMonitoring !== true) {
       return Promise.resolve(null);
     }
     if (!force && (state.openaiStatusLoading || state.openaiStatusLoaded)) {
@@ -2081,6 +2095,7 @@
       showTrendChart: state.showLineChart !== false || state.showDonutChart === true,
       showTextStatistics: state.showTextStatistics !== false,
       showPageButton: state.showPageButton !== false,
+      openAIStatusMonitoring: state.openAIStatusMonitoring === true,
       statisticsSectionOrder: normalizeStatisticsSectionOrder(state.statisticsSectionOrder),
       startDate: dateNoLaterThanToday(state.startDate),
       // An empty persisted end date is the durable "through today" sentinel.
@@ -4096,6 +4111,11 @@
   }
 
   function renderOpenAIStatusPanel(state) {
+    if (state.openAIStatusMonitoring !== true) {
+      return '<section class="usage-openai-status"><div class="usage-openai-error"><strong>' +
+        escapeHtml(text(state, "statusMonitorDisabled")) + '</strong></div>' +
+        renderStatusSourceLink(state, null) + '</section>';
+    }
     if (state.openaiStatusError) {
       return [
         '<section class="usage-openai-status">',
@@ -4267,6 +4287,18 @@
         [
           renderSettingsOption(state, "data-page-button-select", "show", text(state, "pageButtonShow"), state.showPageButton !== false),
           renderSettingsOption(state, "data-page-button-select", "hide", text(state, "pageButtonHide"), state.showPageButton === false)
+        ].join("")
+      )
+    );
+    basicCategories.push(
+      renderSettingsCategory(
+        state,
+        "status-monitor",
+        text(state, "statusMonitorSetting"),
+        text(state, state.openAIStatusMonitoring === true ? "statusMonitorOn" : "statusMonitorOff"),
+        [
+          renderSettingsOption(state, "data-status-monitor-select", "on", text(state, "statusMonitorOn"), state.openAIStatusMonitoring === true),
+          renderSettingsOption(state, "data-status-monitor-select", "off", text(state, "statusMonitorOff"), state.openAIStatusMonitoring !== true)
         ].join("")
       )
     );
@@ -6299,6 +6331,20 @@
         });
       });
     });
+    Array.prototype.forEach.call(state.container.querySelectorAll("[data-status-monitor-select]"), function bindStatusMonitoringOption(button) {
+      button.addEventListener("click", function changeStatusMonitoring() {
+        state.openAIStatusMonitoring = button.getAttribute("data-status-monitor-select") === "on";
+        state.openaiStatus = null;
+        state.openaiStatusLoaded = false;
+        state.openaiStatusError = "";
+        render(state);
+        saveSettings(state, ["openAIStatusMonitoring"]).then(function savedMonitoring() {
+          if (state.openAIStatusMonitoring && isActiveStatusView(state)) ensureOpenAIStatus(state, true);
+        }).catch(function failed(error) {
+          setStatus(state, String((error && error.message) || error || text(state, "loadFailed")), true);
+        });
+      });
+    });
     Array.prototype.forEach.call(state.container.querySelectorAll("[data-language-select]"), function bindLanguageOption(languageOption) {
       languageOption.addEventListener("click", function changeLanguage() {
         state.language = normalizeLanguage(languageOption.getAttribute("data-language-select"));
@@ -8305,6 +8351,7 @@
       state.showTrendChart = state.showLineChart || state.showDonutChart;
       state.showTextStatistics = settings.showTextStatistics !== false;
       state.showPageButton = settings.showPageButton !== false;
+      state.openAIStatusMonitoring = settings.openAIStatusMonitoring === true;
       state.statisticsSectionOrder = normalizeStatisticsSectionOrder(
         settings.statisticsSectionOrder
       );
@@ -8438,6 +8485,7 @@
       var nextShowTrendChart = nextShowLineChart || nextShowDonutChart;
       var nextShowTextStatistics = settings.showTextStatistics !== false;
       var nextShowPageButton = settings.showPageButton !== false;
+      var nextOpenAIStatusMonitoring = settings.openAIStatusMonitoring === true;
       var nextStatisticsSectionOrder = normalizeStatisticsSectionOrder(
         settings.statisticsSectionOrder
       );
@@ -8460,6 +8508,7 @@
          nextShowTrendChart !== (state.showTrendChart !== false) ||
          nextShowTextStatistics !== (state.showTextStatistics !== false) ||
          nextShowPageButton !== (state.showPageButton !== false) ||
+         nextOpenAIStatusMonitoring !== (state.openAIStatusMonitoring === true) ||
          JSON.stringify(nextStatisticsSectionOrder) !==
            JSON.stringify(normalizeStatisticsSectionOrder(state.statisticsSectionOrder)) ||
          modelSelectionSettingsChanged;
@@ -8492,6 +8541,11 @@
       state.showTrendChart = nextShowTrendChart;
       state.showTextStatistics = nextShowTextStatistics;
       state.showPageButton = nextShowPageButton;
+      if (state.openAIStatusMonitoring !== nextOpenAIStatusMonitoring) {
+        state.openaiStatus = null;
+        state.openaiStatusLoaded = false;
+      }
+      state.openAIStatusMonitoring = nextOpenAIStatusMonitoring;
       state.statisticsSectionOrder = nextStatisticsSectionOrder;
       applyPersistedModelSelections(state, settings);
       ensureSelection(state);
@@ -8948,6 +9002,7 @@
       showTrendChart: true,
       showTextStatistics: true,
       showPageButton: true,
+      openAIStatusMonitoring: false,
       statisticsSectionOrder: DEFAULT_STATISTICS_SECTION_ORDER.slice(),
       settingsMenuOpen: false,
       settingsSubmenu: "",

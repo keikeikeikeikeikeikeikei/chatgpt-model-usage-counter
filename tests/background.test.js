@@ -5547,6 +5547,7 @@ test("sanitizeSettings keeps only supported UI languages, main views, and statis
     showTrendChart: false,
     showTextStatistics: true,
     showPageButton: true,
+    openAIStatusMonitoring: false,
     statisticsSectionOrder: ["text", "line", "text", "invalid"],
     mappedVisibleModels: ["GPT-5.6 Sol"],
     mappedKnownModels: ["GPT-5.6 Sol", "GPT-5.6 Luna"],
@@ -5569,6 +5570,7 @@ test("sanitizeSettings keeps only supported UI languages, main views, and statis
     showTrendChart: false,
     showTextStatistics: true,
     showPageButton: true,
+    openAIStatusMonitoring: false,
     statisticsSectionOrder: ["text", "line", "donut"],
     mappedVisibleModels: ["GPT-5.6 Sol"],
     mappedKnownModels: ["GPT-5.6 Sol", "GPT-5.6 Luna"],
@@ -5604,6 +5606,7 @@ test("sanitizeSettings keeps only supported UI languages, main views, and statis
     showTrendChart: true,
     showTextStatistics: true,
     showPageButton: true,
+    openAIStatusMonitoring: false,
     statisticsSectionOrder: ["line", "donut", "text"],
     mappedVisibleModels: [],
     mappedKnownModels: [],
@@ -5628,6 +5631,7 @@ test("sanitizeSettings keeps only supported UI languages, main views, and statis
     showTrendChart: true,
     showTextStatistics: true,
     showPageButton: true,
+    openAIStatusMonitoring: false,
     statisticsSectionOrder: ["line", "donut", "text"],
     mappedVisibleModels: [],
     mappedKnownModels: [],
@@ -5698,6 +5702,7 @@ test("sanitizeSettings clamps stored future dates to the current local calendar 
     showTrendChart: true,
     showTextStatistics: true,
     showPageButton: true,
+    openAIStatusMonitoring: false,
     statisticsSectionOrder: ["line", "donut", "text"],
     mappedVisibleModels: [],
     mappedKnownModels: [],
@@ -5724,6 +5729,7 @@ test("mergeSettings updates one shared UI preference without resetting the other
     showTrendChart: true,
     showTextStatistics: true,
     showPageButton: true,
+    openAIStatusMonitoring: false,
     statisticsSectionOrder: ["donut", "text", "line"],
     mappedVisibleModels: ["GPT-5.6 Sol"],
     mappedKnownModels: ["GPT-5.6 Sol", "GPT-5.6 Luna"],
@@ -5748,6 +5754,7 @@ test("mergeSettings updates one shared UI preference without resetting the other
     showTrendChart: true,
     showTextStatistics: true,
     showPageButton: true,
+    openAIStatusMonitoring: false,
     statisticsSectionOrder: ["donut", "text", "line"],
     mappedVisibleModels: ["GPT-5.6 Sol"],
     mappedKnownModels: ["GPT-5.6 Sol", "GPT-5.6 Luna"],
@@ -6439,9 +6446,7 @@ test("service worker script registers available chrome events without requiring 
   assert.equal(listeners[0][0], "message");
   assert.equal(listeners[1][0], "installed");
   assert.equal(listeners[2][0], "alarm");
-  assert.equal(alarms.length, 1);
-  assert.equal(alarms[0].name, background.STATUS_ALARM_NAME);
-  assert.equal(alarms[0].options.periodInMinutes, background.STATUS_ALARM_PERIOD_MINUTES);
+  assert.equal(alarms.length, 0, "status polling must not start until explicitly enabled");
 });
 
 test("service worker wake after extension update preserves the last catalog-proven public mapping", async () => {
@@ -6580,6 +6585,7 @@ test("status alarm stores latest OpenAI status while preserving the numeric tool
   const listeners = [];
   const countedAt = new Date("2026-08-24T12:00:00.000Z");
   const stored = {
+    [background.SETTINGS_KEY]: background.sanitizeSettings({ openAIStatusMonitoring: true }),
     [background.STORAGE_KEY]: background.applyIncrement(
       background.createEmptyStats(),
       {

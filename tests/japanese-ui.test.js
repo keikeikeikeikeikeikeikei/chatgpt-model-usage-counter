@@ -31,10 +31,15 @@ test("Japanese dashboard translates its empty state and settings, retaining EN/Z
   assert.match(ja, /日本語/);
   assert.match(ja, /data-page-button-select="hide" aria-pressed="true"/);
   assert.match(ja, /ページ内ボタン/);
+  assert.match(ja, /data-status-monitor-select="off" aria-pressed="true"/);
+  assert.match(ja, /OpenAIの稼働状況監視/);
+  assert.match(ja, /オフ（API通信なし）/);
   assert.match(ja, /非表示/);
   const en = dashboard.renderSettingsMenu(settings("en", true));
   const zh = dashboard.renderSettingsMenu(settings("zh", true));
   assert.match(en, /In-page button/);
+  assert.match(en, /OpenAI status monitoring/);
+  assert.match(zh, /OpenAI 状态监控/);
   assert.match(zh, /网页内入口/);
   assert.match(en, /data-language-select="en"/);
   assert.match(zh, /data-language-select="zh"/);

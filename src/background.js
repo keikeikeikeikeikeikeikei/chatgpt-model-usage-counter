@@ -49,6 +49,9 @@
   var STATUS_ALARM_NAME = "chatgpt-model-usage-openai-status";
   var DATE_ROLLOVER_ALARM_NAME = "chatgpt-model-usage-date-rollover";
   var STATUS_ALARM_PERIOD_MINUTES = 5;
+  // Disabled by default: no periodic requests to status.openai.com.
+  var openAIStatusMonitoring = false;
+  var statusMonitoringSettingsRevision = 0;
   var MAX_EVENTS = 500;
   var DOWNLOAD_FINAL_TIMEOUT_MS = 5 * 60 * 1000;
   var activeDownloadsByOperationId = {};
@@ -165,6 +168,7 @@
       showTrendChart: true,
       showTextStatistics: true,
       showPageButton: true,
+      openAIStatusMonitoring: false,
       statisticsSectionOrder: ["line", "donut", "text"],
       mappedVisibleModels: [],
       mappedKnownModels: [],
@@ -254,6 +258,7 @@
       showTrendChart: showLineChart || showDonutChart,
       showTextStatistics: base.showTextStatistics !== false,
       showPageButton: base.showPageButton !== false,
+      openAIStatusMonitoring: base.openAIStatusMonitoring === true,
       statisticsSectionOrder: sanitizeStatisticsSectionOrder(base.statisticsSectionOrder),
       mappedVisibleModels: sanitizeSettingsModelList(base.mappedVisibleModels),
       mappedKnownModels: sanitizeSettingsModelList(base.mappedKnownModels),
@@ -5922,13 +5927,13 @@
         }
       } catch (_) {}
     }
-    chrome.action.setBadgeBackgroundColor({ color: statusBadgeColor(statusRecord) });
+    chrome.action.setBadgeBackgroundColor({ color: statusBadgeColor(openAIStatusMonitoring ? statusRecord : null) });
     if (typeof chrome.action.setBadgeTextColor === "function") {
       try { chrome.action.setBadgeTextColor({ color: "#ffffff" }); } catch (_) {}
     }
     chrome.action.setBadgeText({ text: text });
     if (typeof chrome.action.setTitle === "function") {
-      chrome.action.setTitle({ title: actionTitle(stats || createEmptyStats(), statusRecord) });
+      chrome.action.setTitle({ title: actionTitle(stats || createEmptyStats(), openAIStatusMonitoring ? statusRecord : null) });
     }
   }
 
@@ -7018,6 +7023,10 @@
         item.settings
       );
       chrome.storage.local.set({ [SETTINGS_KEY]: nextSettings }, function handleSet() {
+        if (Object.prototype.hasOwnProperty.call(item.settings, "openAIStatusMonitoring")) {
+          statusMonitoringSettingsRevision += 1;
+          applyOpenAIStatusMonitoring(nextSettings.openAIStatusMonitoring === true);
+        }
         if (item.callback) item.callback(nextSettings);
         settingsWriteBusy = false;
         drainSettingsWriteQueue();
@@ -7052,7 +7061,16 @@
   }
 
   function refreshOpenAIStatus(callback) {
+    if (!openAIStatusMonitoring) {
+      if (callback) callback({ ok: false, error: "status-monitoring-disabled" });
+      return;
+    }
     fetchOpenAIStatus(function handleStatus(response) {
+      // Do not persist or color the badge from an in-flight request after disabling.
+      if (!openAIStatusMonitoring) {
+        if (callback) callback({ ok: false, error: "status-monitoring-disabled" });
+        return;
+      }
       var record = createOpenAIStatusRecord(response, new Date().toISOString());
       statusSet(record, function savedStatus(savedRecord) {
         if (callback) {
@@ -7063,10 +7081,36 @@
   }
 
   function ensureStatusAlarm() {
-    if (typeof chrome === "undefined" || !chrome.alarms || typeof chrome.alarms.create !== "function") {
+    if (typeof chrome === "undefined" || !chrome.alarms) return;
+    if (!openAIStatusMonitoring) {
+      if (typeof chrome.alarms.clear === "function") chrome.alarms.clear(STATUS_ALARM_NAME);
       return;
     }
-    chrome.alarms.create(STATUS_ALARM_NAME, { periodInMinutes: STATUS_ALARM_PERIOD_MINUTES });
+    if (typeof chrome.alarms.create === "function") {
+      chrome.alarms.create(STATUS_ALARM_NAME, { periodInMinutes: STATUS_ALARM_PERIOD_MINUTES });
+    }
+  }
+
+  function applyOpenAIStatusMonitoring(enabled) {
+    var wasEnabled = openAIStatusMonitoring;
+    openAIStatusMonitoring = enabled === true;
+    ensureStatusAlarm();
+    if (openAIStatusMonitoring && !wasEnabled) {
+      refreshOpenAIStatus();
+    } else if (!openAIStatusMonitoring) {
+      // Clear any previously orange/red status color immediately; leave the count.
+      storageGet(function refreshUsageOnlyBadge(stats, error) {
+        if (!error) setBadge(stats, null);
+      });
+    }
+  }
+
+  function restoreOpenAIStatusMonitoring() {
+    var revision = statusMonitoringSettingsRevision;
+    settingsGet(function restored(settings, error) {
+      if (revision !== statusMonitoringSettingsRevision) return;
+      applyOpenAIStatusMonitoring(!error && settings && settings.openAIStatusMonitoring === true);
+    });
   }
 
   function storageGetPromise() {
@@ -8310,6 +8354,10 @@
     }
 
     if (message.type === "openai.status.get") {
+      if (!openAIStatusMonitoring) {
+        sendResponse({ ok: false, error: "status-monitoring-disabled" });
+        return false;
+      }
       statusGet(function respondWithCachedStatus(statusRecord) {
         // 只有"成功且有内容"的缓存才直接返回;缓存为空或上次抓取失败(ok:false)时强制重新抓取。
         // 否则一次失败被缓存后,之后每次读取/刷新都卡在旧的失败结果上,表现为"状态无法获取、刷新没用"。
@@ -8634,16 +8682,16 @@
     // 后续 setBadge(计数/状态刷新/面板推送范围)都会带上这个过滤器生效。
     loadBadgeFilter();
     addChromeListener(chrome.runtime.onInstalled, function handleInstalled() {
-      ensureStatusAlarm();
-      loadBadgeFilter(function afterBadgeFilter() { refreshOpenAIStatus(); });
+      restoreOpenAIStatusMonitoring();
+      loadBadgeFilter();
     });
     addChromeListener(chrome.runtime.onStartup, function handleStartup() {
-      ensureStatusAlarm();
-      loadBadgeFilter(function afterBadgeFilter() { refreshOpenAIStatus(); });
+      restoreOpenAIStatusMonitoring();
+      loadBadgeFilter();
     });
     addChromeListener(chrome.alarms && chrome.alarms.onAlarm, function handleAlarm(alarm) {
       if (alarm && alarm.name === STATUS_ALARM_NAME) {
-        loadBadgeFilter(function afterBadgeFilter() { refreshOpenAIStatus(); });
+        if (openAIStatusMonitoring) loadBadgeFilter(function afterBadgeFilter() { refreshOpenAIStatus(); });
       } else if (alarm && alarm.name === DATE_ROLLOVER_ALARM_NAME) {
         loadBadgeFilter(function afterBadgeFilter() {
           storageGet(function refreshDateBadge(stats, error) {
@@ -8669,7 +8717,7 @@
     addChromeListener(chrome.webRequest && chrome.webRequest.onBeforeRequest, function handleBeforeRequest(details) {
       observeNetworkRequest(details);
     }, { urls: CHATGPT_URL_PATTERNS }, ["requestBody"]);
-    ensureStatusAlarm();
+    restoreOpenAIStatusMonitoring();
   }
 
   root.ChatGPTUsageBackground = {

@@ -1985,7 +1985,7 @@ test("popup and page dashboards share aligned header controls and popup spacing"
   assert.equal((pageContainer.innerHTML.match(/class="usage-settings-menu"/g) || []).length, 1);
   assert.doesNotMatch(pageContainer.innerHTML, /usage-language-toggle|data-language-toggle/);
   assert.doesNotMatch(pageContainer.innerHTML, /usage-panel-close|data-panel-close/);
-  const expectedSettingsOrder = ["language", "page-button", "theme", "source", "statistics", "sections", "data"];
+  const expectedSettingsOrder = ["language", "page-button", "status-monitor", "theme", "source", "statistics", "sections", "data"];
   [popupContainer.innerHTML, pageContainer.innerHTML].forEach((html) => {
     assert.deepEqual(
       Array.from(html.matchAll(/data-settings-category="([^"]+)"/g), (match) => match[1]),
@@ -2007,7 +2007,7 @@ test("popup and page dashboards share aligned header controls and popup spacing"
       ["line", "donut", "text"]
     );
   });
-  ["language", "page-button", "theme", "source", "statistics", "sections", "data"].forEach((category) => {
+  ["language", "page-button", "status-monitor", "theme", "source", "statistics", "sections", "data"].forEach((category) => {
     assert.match(popupContainer.innerHTML, new RegExp(`data-settings-category="${category}"`));
     assert.match(pageContainer.innerHTML, new RegExp(`data-settings-category="${category}"`));
   });
@@ -2209,6 +2209,7 @@ test("a pending async reload cannot turn a Usage hover preview into an account c
         settings: {
           language: "en",
           activeView: "status",
+          openAIStatusMonitoring: true,
           statisticsMode: "mapped",
           chartType: "line",
           themeMode: "system",
@@ -3914,6 +3915,7 @@ test("parameterCombinations prefers stored aggregate when available", () => {
 test("renderOpenAIStatusPanel shows ChatGPT web availability without unrelated product blocks", () => {
   const html = dashboard.renderOpenAIStatusPanel({
     language: "en",
+    openAIStatusMonitoring: true,
     openaiStatus: {
       fetchedAt: "2026-05-30T12:04:00.000Z",
       sourceUrl: "https://status.openai.com/",
@@ -3970,6 +3972,7 @@ test("renderOpenAIStatusPanel shows ChatGPT web availability without unrelated p
 test("renderOpenAIStatusPanel omits incident block when there are no related incidents", () => {
   const html = dashboard.renderOpenAIStatusPanel({
     language: "en",
+    openAIStatusMonitoring: true,
     openaiStatus: {
       fetchedAt: "2026-05-30T12:04:00.000Z",
       sourceUrl: "https://status.openai.com/",
@@ -3989,6 +3992,7 @@ test("renderOpenAIStatusPanel omits incident block when there are no related inc
 test("renderOpenAIStatusPanel shows loading state before status data exists", () => {
   const html = dashboard.renderOpenAIStatusPanel({
     language: "en",
+    openAIStatusMonitoring: true,
     openaiStatus: null,
     openaiStatusLoading: true
   });
