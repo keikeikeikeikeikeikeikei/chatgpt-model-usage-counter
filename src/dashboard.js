@@ -500,6 +500,11 @@
     featureCodeInterpreter: "代码解释器",
     featureConnectors: "连接器",
     featureDeepResearch: "Deep Research",
+    featureUsageTitle: "检测到的功能请求",
+    featureUsageToday: "今天",
+    featureUsagePeriod: "所选期间",
+    featureUsageAllTime: "累计（所有来源）",
+    featureUsageNote: "仅统计检测到的提交。不是剩余额度或生成图片张数。",
     featureFileUpload: "文件",
     featureGpts: "GPTs",
     featureImageGeneration: "图片生成",
@@ -636,6 +641,11 @@
     featureCodeInterpreter: "Code interpreter",
     featureConnectors: "Connectors",
     featureDeepResearch: "Deep Research",
+    featureUsageTitle: "Detected feature requests",
+    featureUsageToday: "Today",
+    featureUsagePeriod: "Selected period",
+    featureUsageAllTime: "All time (all sources)",
+    featureUsageNote: "Observed submissions only. Not remaining quota or generated image count.",
     featureFileUpload: "Files",
     featureGpts: "GPTs",
     featureImageGeneration: "Image generation",
@@ -846,6 +856,11 @@
     "featureCodeInterpreter": "コードインタープリター",
     "featureConnectors": "コネクター",
     "featureDeepResearch": "Deep Research",
+    "featureUsageTitle": "機能の使用回数（検出）",
+    "featureUsageToday": "今日",
+    "featureUsagePeriod": "選択期間",
+    "featureUsageAllTime": "累計（全ソース）",
+    "featureUsageNote": "検出された送信のみ集計。残り利用枠や生成画像の枚数ではありません。",
     "featureFileUpload": "ファイル",
     "featureGpts": "GPTs",
     "featureImageGeneration": "画像生成",
@@ -1885,11 +1900,13 @@
 
     if (!entries.length && !Object.keys(stats.analyticsByDate || {}).length) {
       rangeEvents(stats, state, model).forEach(function addRetainedEvent(event) {
+        var seen = {};
         (Array.isArray(event && event.usageFeatures) ? event.usageFeatures : []).forEach(function addFeature(rawId) {
           var id = normalizeDashboardFeatureId(rawId);
-          if (!id) {
+          if (!id || seen[id]) {
             return;
           }
+          seen[id] = true;
           var row = rowsById[id] || {
             id: id,
             label: featureLabel(state, id),
@@ -3252,6 +3269,71 @@
 
   function statisticsColorForKey(state, key) {
     return statisticsColorMap(state)[String(key || "")] || COLORS[0];
+  }
+
+  // These counters describe observed feature-bearing submissions, not
+  // completed research reports, image files, or OpenAI's remaining quota.
+  // Reuse the existing date/source-aware model aggregation, including legacy
+  // all-time feature aggregates that outlive the limited retained event list.
+  function observedFeatureCounts(stats, state) {
+    stats = sanitizeDashboardStats(stats || {});
+    var sourceFilter = normalizeSourceModeFilter(state && state.sourceModeFilter);
+    var day = todayKey();
+    var models = {};
+    Object.keys(stats.totals || {}).forEach(function include(model) { models[model] = true; });
+    Object.keys(stats.featuresByModel || {}).forEach(function include(model) { models[model] = true; });
+    Object.keys(stats.analyticsByDate || {}).forEach(function includeDate(date) {
+      var entry = stats.analyticsByDate[date] || {};
+      ["chat", "work", "unknown"].forEach(function includeSource(source) {
+        Object.keys(entry[source] || {}).forEach(function include(model) { models[model] = true; });
+      });
+    });
+    (stats.events || []).forEach(function includeEvent(event) {
+      if (event && event.model) models[event.model] = true;
+    });
+    var result = {
+      deep_research: { today: 0, period: 0, allTime: 0 },
+      image_generation: { today: 0, period: 0, allTime: 0 }
+    };
+    var periods = {
+      today: { startDate: day, endDate: day, sourceModeFilter: sourceFilter },
+      period: {
+        startDate: state && state.startDate || "",
+        endDate: state && state.endDate || "",
+        sourceModeFilter: sourceFilter
+      },
+      allTime: { startDate: "", endDate: "", sourceModeFilter: "all" }
+    };
+    Object.keys(models).forEach(function tallyModel(model) {
+      Object.keys(periods).forEach(function tallyPeriod(period) {
+        modelFeatures(stats, model, periods[period]).forEach(function tallyFeature(feature) {
+          if (result[feature.id]) {
+            result[feature.id][period] += Math.max(0, Number(feature.count) || 0);
+          }
+        });
+      });
+    });
+    return result;
+  }
+
+  function renderObservedFeatureCounts(state) {
+    var counts = observedFeatureCounts(state.stats, state);
+    return [
+      '<section class="usage-feature-summary" aria-label="' + escapeHtml(text(state, "featureUsageTitle")) + '">',
+      '<h3>' + escapeHtml(text(state, "featureUsageTitle")) + '</h3>',
+      '<div class="usage-feature-summary-grid">',
+      ["deep_research", "image_generation"].map(function featureCard(id) {
+        var row = counts[id];
+        return '<div class="usage-feature-summary-card" data-feature="' + id + '">' +
+          '<strong>' + escapeHtml(featureLabel(state, id)) + '</strong>' +
+          '<dl>' +
+          '<div><dt>' + escapeHtml(text(state, "featureUsageToday")) + '</dt><dd>' + row.today + '</dd></div>' +
+          '<div><dt>' + escapeHtml(text(state, "featureUsagePeriod")) + '</dt><dd>' + row.period + '</dd></div>' +
+          '<div><dt>' + escapeHtml(text(state, "featureUsageAllTime")) + '</dt><dd>' + row.allTime + '</dd></div>' +
+          '</dl></div>';
+      }).join(""),
+      '</div><p>' + escapeHtml(text(state, "featureUsageNote")) + '</p></section>'
+    ].join("");
   }
 
   function renderFeaturePills(features, state) {
@@ -4867,6 +4949,7 @@
       '<section class="usage-text-panel usage-chart-panel">',
       renderDateControls(state),
       renderStatisticsCompletenessWarning(state),
+      renderObservedFeatureCounts(state),
       focusBar,
       renderedSections,
       "</section>",
@@ -8732,6 +8815,16 @@
       ".usage-count-numbers{text-align:right}",
       ".usage-count-numbers b{display:block;color:var(--usage-accent-link)}",
       ".usage-count-numbers small{display:block;color:var(--usage-text-muted)}",
+      ".usage-feature-summary{margin:8px 0 12px;padding:11px;border:1px solid var(--usage-border-divider);border-radius:10px;background:var(--usage-surface-panel)}",
+      ".usage-feature-summary h3{margin:0 0 8px;font-size:13px;color:var(--usage-text-primary)}",
+      ".usage-feature-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}",
+      ".usage-feature-summary-card{min-width:0;padding:9px;border-radius:8px;background:var(--usage-surface-chip)}",
+      ".usage-feature-summary-card>strong{display:block;font-size:12px;color:var(--usage-text-primary);margin-bottom:7px}",
+      ".usage-feature-summary-card dl{margin:0;display:grid;gap:3px}",
+      ".usage-feature-summary-card dl>div{display:flex;justify-content:space-between;align-items:baseline;gap:4px}",
+      ".usage-feature-summary-card dt{font-size:10px;color:var(--usage-text-secondary)}",
+      ".usage-feature-summary-card dd{margin:0;font-size:13px;font-weight:700;color:var(--usage-accent-link);font-variant-numeric:tabular-nums}",
+      ".usage-feature-summary>p{margin:7px 0 0;font-size:10px;line-height:1.5;color:var(--usage-text-muted)}",
       ".usage-count-features{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}",
       ".usage-count-features span{display:inline-flex;gap:4px;align-items:center;min-height:20px;padding:2px 6px;border-radius:999px;background:var(--usage-surface-chip);color:var(--usage-text-body-subtle)}",
       ".usage-count-features span,.usage-count-features b{font-size:11px;line-height:1.35;font-weight:600}",
@@ -9055,6 +9148,8 @@
       resolveDashboardTheme: resolveDashboardTheme,
       renderModelCountRows: renderModelCountRows,
       renderStatisticsCompletenessWarning: renderStatisticsCompletenessWarning,
+      observedFeatureCounts: observedFeatureCounts,
+      renderObservedFeatureCounts: renderObservedFeatureCounts,
       statisticsTotalsInRange: statisticsTotalsInRange,
       statisticsColorMap: statisticsColorMap,
       applyPopupThemeVariables: applyPopupThemeVariables,

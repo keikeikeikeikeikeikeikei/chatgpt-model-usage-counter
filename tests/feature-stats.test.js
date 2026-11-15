@@ -350,3 +350,77 @@ test("reasoning effort is tracked as a per-model parameter dimension", () => {
   );
   assert.deepEqual(next.parametersByModel["gpt-5-5-thinking"].fields["reasoning.effort"], { high: 1 });
 });
+
+test("dedicated Deep Research and image-request counters honor dates and sources", () => {
+  const now = new Date();
+  const current = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+  const previous = new Date(current);
+  previous.setDate(previous.getDate() - 1);
+  const dateKey = (date) => [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0")
+  ].join("-");
+  let stats = background.createEmptyStats();
+  [
+    { at: previous, hash: "previous-both", source: "chat", features: ["deep_research", "image_generation"] },
+    { at: current, hash: "current-deep", source: "chat", features: ["deep_research"] },
+    { at: current, hash: "current-image", source: "work", features: ["image_generation"] },
+    { at: current, hash: "ordinary-message", source: "chat", features: [] }
+  ].forEach((item) => {
+    stats = background.applyIncrement(stats, featurePayload("gpt-6-thinking", item.hash, {
+      sourceMode: item.source,
+      submittedAt: item.at.toISOString(),
+      usageFeatures: item.features
+    }), item.at);
+  });
+  const query = {
+    startDate: dateKey(current),
+    endDate: dateKey(current),
+    sourceModeFilter: "all"
+  };
+  const count = dashboard._test.observedFeatureCounts;
+  assert.deepEqual(count(stats, query), {
+    deep_research: { today: 1, period: 1, allTime: 2 },
+    image_generation: { today: 1, period: 1, allTime: 2 }
+  });
+  assert.deepEqual(count(stats, { ...query, sourceModeFilter: "chat" }), {
+    deep_research: { today: 1, period: 1, allTime: 2 },
+    image_generation: { today: 0, period: 0, allTime: 2 }
+  });
+  assert.deepEqual(count(stats, {
+    startDate: dateKey(previous), endDate: dateKey(previous), sourceModeFilter: "all"
+  }), {
+    deep_research: { today: 1, period: 1, allTime: 2 },
+    image_generation: { today: 1, period: 1, allTime: 2 }
+  });
+  // Clearing retained event details must not erase already aggregated features.
+  const withoutEvents = { ...stats, events: [], eventHistoryComplete: false };
+  assert.deepEqual(count(withoutEvents, query), count(stats, query));
+
+  const en = dashboard._test.renderObservedFeatureCounts({ stats, language: "en", ...query });
+  assert.match(en, /data-feature="deep_research"/);
+  assert.match(en, /data-feature="image_generation"/);
+  assert.match(en, /Not remaining quota/);
+  const ja = dashboard._test.renderObservedFeatureCounts({ stats, language: "ja", ...query });
+  assert.match(ja, /選択期間/);
+  assert.match(ja, /残り利用枠/);
+});
+
+test("feature counters use retained events only when daily aggregates are absent", () => {
+  const now = new Date();
+  const day = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+  const stats = background.createEmptyStats();
+  stats.totals["gpt-6-thinking"] = 1;
+  stats.byDate[day] = { "gpt-6-thinking": 1 };
+  stats.events = [{
+    model: "gpt-6-thinking", submittedAt: now.toISOString(),
+    recordedDateKey: day, dateKeyBasis: "local", sourceMode: "chat",
+    usageFeatures: ["deep_research", "deep_research", "image_generation"]
+  }];
+  const result = dashboard._test.observedFeatureCounts(stats, { startDate: day, endDate: day });
+  assert.deepEqual(result, {
+    deep_research: { today: 1, period: 1, allTime: 1 },
+    image_generation: { today: 1, period: 1, allTime: 1 }
+  });
+});

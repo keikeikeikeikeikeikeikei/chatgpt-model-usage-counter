@@ -37,7 +37,7 @@
 
 - **日本語に切り替える:** ChatGPTページ右上の「使用量」ボタン、またはChromeの拡張機能アイコンから画面を開き、**設定 → 言語 → 日本語**を選択します。英語・中国語にも切り替えられます。
 - **ページ右上のボタンを隠す:** **設定 → ページ内ボタン → 非表示**を選択します。ページ内の入口だけが消え、統計の記録とChromeツールバーからの表示は引き続き利用できます。
-- **確認できる内容:** モデルごとの使用量、日別の推移、Basic／Advanced表示、Chat／Work別の集計、統計データのバックアップ、会話のローカルエクスポート。
+- **確認できる内容:** モデルごとの使用量、日別の推移、Basic／Advanced表示、Chat／Work別の集計、Deep Research・画像生成の検出された送信回数（今日・選択期間・累計）、統計データのバックアップ、会話のローカルエクスポート。機能の使用回数は公式の残り利用枠や生成画像枚数ではありません。
 - **インストール:** [Releases](https://github.com/Bsnblanc/chatgpt-model-usage-counter/releases)から拡張機能を取得して展開し、`chrome://extensions/` で開発者モードを有効にして「パッケージ化されていない拡張機能を読み込む」から選択します。
 
 この機能は開発ブランチでの追加です。本家の公開リリースにはまだ反映されていない場合があります。
@@ -109,6 +109,7 @@ The extension records ChatGPT web submissions, model relationships, and related 
 |---|---|
 | **Automatic language** | The interface follows the ChatGPT page language by default, falls back to the browser language, and can be set to English, Chinese, or Japanese; both entry points share the choice |
 | **Chat / Work** | Chat and Work use the same event pipeline and can be filtered by All, Chat, or Work |
+| **Deep Research and image requests** | The Usage panel shows detected feature-bearing submissions today, during the selected date range, and across recorded history. Today/period respect the Chat/Work filter; all-time includes all sources. Counts are not remaining OpenAI quota, completed reports, or generated image files. Historical data without feature evidence cannot be reconstructed. No extra ChatGPT API polling is added. |
 | **One count per submission** | A submission creates one event; request and final-response evidence update that same event without adding a second count |
 | **Basic (mapped)** | Aggregates by the public model resolved from the signed-in account catalog; an unmapped new model keeps its exact internal slug instead of being guessed |
 | **Advanced (internal)** | Groups by request model and then actual response model; reasoning effort follows the matching response model, while missing request and response values remain independently Unknown |
